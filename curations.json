@@ -1,0 +1,9 @@
+{
+  "curations": [
+    {
+      "id": "the-strager",
+      "imdb_id": "http://example.com",
+      "imdb_score": 10
+    }
+  ]
+}

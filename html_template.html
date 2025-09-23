@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>CineLibri 2025 прожекции</title>
+    <style>
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height:1.6; color:#333; background:#f8f9fa; }
+        .container { max-width:1200px; margin:0 auto; padding:20px; }
+        h1 { text-align:center; color:#2c3e50; margin-bottom:24px; font-size:2.1rem; }
+
+        .controls {
+            background:#fff; padding:16px; border-radius:8px; box-shadow:0 2px 10px rgba(0,0,0,.08);
+            margin-bottom:18px; display:flex; flex-wrap:wrap; gap:12px; align-items:center;
+        }
+        .filter-group { display:flex; flex-direction:column; gap:6px; }
+        label { font-weight:600; color:#555; font-size:.92rem; }
+        input, select, button { padding:8px 12px; border:1px solid #ddd; border-radius:6px; font-size:14px; background:#fff; }
+        input[type="date"]{ min-width:150px; }
+
+        .table-container { background:#fff; border-radius:8px; overflow:hidden; box-shadow:0 2px 10px rgba(0,0,0,.08); }
+        table { width:100%; border-collapse:collapse; }
+        th {
+            background:#34495e; color:#fff; padding:12px 10px; text-align:left; font-weight:600; cursor:pointer; position:relative;
+            user-select:none;
+        }
+        th:hover { background:#2c3e50; }
+        th.sorted-asc::after { content:' ↑'; position:absolute; right:8px; }
+        th.sorted-desc::after { content:' ↓'; position:absolute; right:8px; }
+
+        td { padding:12px; border-bottom:1px solid #eee; vertical-align:top; }
+        tr:nth-child(even) { background:#f8f9fa; }
+        tr:hover { background:#e8f4f8; }
+
+        .film-title { font-weight:700; color:#2c3e50; display:flex; align-items:center; gap:8px; }
+        .expander { display:inline-block; width:1.1em; text-align:center; font-size:.95em; color:#2c3e50; transition:transform .12s ease; user-select:none; }
+        .main-row.expanded .expander { transform: rotate(90deg); }
+        .original-title { font-style:italic; color:#666; font-size:.92rem; margin-top:4px; }
+        .genres { color:#666; font-size:.92rem; }
+        .screening-info { font-size:.95rem; }
+        .screening-time { font-weight:600; color:#27ae60; }
+        .screening-location { color:#666; margin-top:2px; }
+
+        .detail-row { background:#fbfdff; }
+        .detail-cell { padding:14px 16px; font-size:.95rem; color:#333; }
+        .screening-list { list-style:none; padding-left:0; margin:0; }
+        .screening-list li { margin-bottom:6px; }
+        .screening-list li.past { text-decoration:line-through; color:#999; }
+
+        .movie-btn, .imdb-btn {
+            display:inline-block; margin-top:8px; padding:8px 12px; border-radius:6px; border:1px solid #2c3e50;
+            background:#2c3e50; color:#fff; cursor:pointer; font-weight:600;
+        }
+        .imdb-btn { background:#f5c518; border-color:#d4a50a; color:#111; margin-left:8px; }
+        .movie-btn:hover, .imdb-btn:hover { opacity:.92; }
+
+        .stats { text-align:center; margin:14px 0; color:#666; font-size:.9rem; }
+
+        @media (max-width:768px) {
+            .controls { flex-direction:column; align-items:stretch; }
+            .filter-group { width:100%; }
+            th, td { padding:8px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>CineLibri 2025 прожекции</h1>
+
+        <div class="controls">
+            <div class="filter-group">
+                <label for="startDate">Начална Дата:</label>
+                <input type="date" id="startDate">
+            </div>
+
+            <div class="filter-group">
+                <label for="endDate">Крайна Дата:</label>
+                <input type="date" id="endDate">
+            </div>
+
+            <div class="filter-group">
+                <label for="locationFilter">Кина:</label>
+                <select id="locationFilter">
+                    <option value="">Всички кина</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="stats" id="stats"></div>
+
+        <div class="table-container" role="region" aria-labelledby="stats">
+            <table id="filmTable" aria-describedby="stats">
+                <thead><!-- header built dynamically --></thead>
+                <tbody id="filmTableBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // Films data will be embedded by the generator replacing this token
+        const filmsData = /*__EMBED_FILMS_JSON__*/;
+
+        let currentSort = { field: 'datetime', direction: 'asc' };
+        let filteredFilms = [...filmsData];
+
+        // Parse datetimes and sort screenings
+        filmsData.forEach(f => {
+            f.screenings.forEach(s => { s.datetime = new Date(s.datetime); });
+            f.screenings.sort((a,b)=> a.datetime - b.datetime);
+        });
+
+        // Detect if any film has an IMDb rating (not-null) so we can show that column
+        const hasIMDBRating = filmsData.some(f => f.imdb && f.imdb.imdb_rating != null);
+
+        // Build header dynamically
+        (function buildHeader(){
+            const thead = document.querySelector('#filmTable thead');
+            const tr = document.createElement('tr');
+
+            const cols = [
+                {key:'title', label:'Заглавие'},
+                {key:'year', label:'Година'},
+                {key:'genres', label:'Жанрове'}
+            ];
+
+            if (hasIMDBRating) cols.push({key:'imdb_rating', label:'IMDb'});
+
+            cols.push({key:'language', label:'Език'});
+            cols.push({key:'datetime', label:'Следваща прожекция'});
+            cols.push({key:'location', label:'Кино'});
+
+            cols.forEach(c => {
+                const th = document.createElement('th');
+                th.dataset.sort = c.key;
+                th.textContent = c.label;
+                tr.appendChild(th);
+            });
+
+            thead.appendChild(tr);
+        })();
+
+        function isoDateString(d){
+            const yyyy = d.getFullYear();
+            const mm = String(d.getMonth()+1).padStart(2,'0');
+            const dd = String(d.getDate()).padStart(2,'0');
+            return `${yyyy}-${mm}-${dd}`;
+        }
+
+        function initializeFilters(){
+            const today = new Date();
+            const plusTwoMonths = new Date(today);
+            plusTwoMonths.setMonth(plusTwoMonths.getMonth()+2);
+
+            const startInput = document.getElementById('startDate');
+            const endInput = document.getElementById('endDate');
+            if (startInput && !startInput.value) startInput.value = isoDateString(today);
+            if (endInput && !endInput.value) endInput.value = isoDateString(plusTwoMonths);
+
+            const locations = new Set();
+            filmsData.forEach(f => f.screenings.forEach(s => { if (s.location) locations.add(s.location); }));
+            populateSelect('locationFilter', Array.from(locations).sort());
+        }
+
+        function populateSelect(id, options){
+            const sel = document.getElementById(id);
+            if (!sel) return;
+            options.forEach(o => { const opt = document.createElement('option'); opt.value=o; opt.textContent=o; sel.appendChild(opt); });
+        }
+
+        function formatDateTime(date){
+            try {
+                return date.toLocaleString('bg-BG', {
+                    weekday: 'short',
+                    day: 'numeric',
+                    month: 'short',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: false
+                });
+            } catch(e){
+                const y = date.getFullYear(), m = String(date.getMonth()+1).padStart(2,'0'), d = String(date.getDate()).padStart(2,'0');
+                const hh = String(date.getHours()).padStart(2,'0'), mm = String(date.getMinutes()).padStart(2,'0');
+                return `${d}.${m}.${y} ${hh}:${mm}`;
+            }
+        }
+
+        function getNextScreening(film, startDate, endDate){
+            let valid = film.screenings;
+            if (startDate || endDate){
+                valid = film.screenings.filter(s=>{
+                    const sd = new Date(s.datetime.toDateString());
+                    if (startDate && sd < startDate) return false;
+                    if (endDate && sd > endDate) return false;
+                    return true;
+                });
+            }
+            return valid[0];
+        }
+
+        function applyFilters(){
+            const startDate = document.getElementById('startDate').value ? new Date(document.getElementById('startDate').value) : null;
+            const endDate = document.getElementById('endDate').value ? new Date(document.getElementById('endDate').value) : null;
+            const locationFilter = document.getElementById('locationFilter').value;
+
+            filteredFilms = filmsData.filter(f => {
+                if (startDate || endDate){
+                    const ok = f.screenings.some(s=>{
+                        const sd = new Date(s.datetime.toDateString());
+                        if (startDate && sd < startDate) return false;
+                        if (endDate && sd > endDate) return false;
+                        return true;
+                    });
+                    if (!ok) return false;
+                }
+                if (locationFilter){
+                    const ok2 = f.screenings.some(s => s.location === locationFilter);
+                    if (!ok2) return false;
+                }
+                return true;
+            });
+
+            sortAndRenderTable();
+            updateStats();
+        }
+
+        function sortFilms(field, direction){
+            filteredFilms.sort((a,b)=>{
+                let vA, vB;
+                switch(field){
+                    case 'title':
+                        vA = (a.title||'').toLowerCase(); vB = (b.title||'').toLowerCase(); break;
+                    case 'year':
+                        // year is optional int | null: treat null as -Infinity so it sorts last for asc
+                        vA = a.year == null ? -Infinity : a.year;
+                        vB = b.year == null ? -Infinity : b.year;
+                        break;
+                    case 'genres':
+                        vA = a.genres||''; vB = b.genres||''; break;
+                    case 'language':
+                        vA = a.language||''; vB = b.language||''; break;
+                    case 'imdb_rating':
+                        vA = (a.imdb && a.imdb.imdb_rating != null) ? a.imdb.imdb_rating : -Infinity;
+                        vB = (b.imdb && b.imdb.imdb_rating != null) ? b.imdb.imdb_rating : -Infinity;
+                        break;
+                    case 'datetime':
+                        const sD = document.getElementById('startDate').value ? new Date(document.getElementById('startDate').value) : null;
+                        const eD = document.getElementById('endDate').value ? new Date(document.getElementById('endDate').value) : null;
+                        const nA = getNextScreening(a,sD,eD), nB = getNextScreening(b,sD,eD);
+                        vA = nA ? nA.datetime : new Date(8640000000000000);
+                        vB = nB ? nB.datetime : new Date(8640000000000000);
+                        break;
+                    case 'location':
+                        const sDL = document.getElementById('startDate').value ? new Date(document.getElementById('startDate').value) : null;
+                        const eDL = document.getElementById('endDate').value ? new Date(document.getElementById('endDate').value) : null;
+                        const nlA = getNextScreening(a,sDL,eDL), nlB = getNextScreening(b,sDL,eDL);
+                        vA = nlA ? (nlA.location||'') : ''; vB = nlB ? (nlB.location||'') : ''; break;
+                    default:
+                        vA = ''; vB = '';
+                }
+                if (vA < vB) return direction==='asc' ? -1 : 1;
+                if (vA > vB) return direction==='asc' ? 1 : -1;
+                return 0;
+            });
+        }
+
+        function renderTable(){
+            const tbody = document.getElementById('filmTableBody');
+            const startDate = document.getElementById('startDate').value ? new Date(document.getElementById('startDate').value) : null;
+            const endDate = document.getElementById('endDate').value ? new Date(document.getElementById('endDate').value) : null;
+
+            tbody.innerHTML = '';
+
+            filteredFilms.forEach(film => {
+                const nextScreening = getNextScreening(film, startDate, endDate);
+                const mainRow = document.createElement('tr');
+                mainRow.className = 'main-row';
+
+                const yearDisplay = film.year == null ? 'N/A' : String(film.year);
+
+                const cells = [];
+
+                // Title with expander
+                const titleHtml = `
+                    <div class="film-title">
+                        <span class="expander" aria-hidden="true">▶</span>
+                        ${film.url ? `<a href="${film.url}" target="_blank" rel="noopener noreferrer">${film.title}</a>` : film.title}
+                    </div>
+                    ${film.original_title && film.original_title !== film.title ? `<div class="original-title">${film.original_title}</div>` : ''}
+                `;
+                cells.push(`<td>${titleHtml}</td>`);
+
+                // Year
+                cells.push(`<td>${yearDisplay}</td>`);
+
+                // Genres
+                cells.push(`<td class="genres">${film.genres || ''}</td>`);
+
+                // IMDb rating (optional)
+                if (hasIMDBRating) {
+                    const r = (film.imdb && film.imdb.imdb_rating != null) ? Number(film.imdb.imdb_rating).toFixed(1) : '';
+                    cells.push(`<td>${r}</td>`);
+                }
+
+                // Language
+                cells.push(`<td>${film.language || ''}</td>`);
+
+                // Next screening
+                cells.push(`<td>${nextScreening ? `<div class="screening-info"><div class="screening-time">${formatDateTime(new Date(nextScreening.datetime))}</div></div>` : 'Няма прожекции'}</td>`);
+
+                // Location
+                cells.push(`<td>${nextScreening ? `<div class="screening-location">${nextScreening.location}</div>` : ''}</td>`);
+
+                mainRow.innerHTML = cells.join('');
+
+                // Detail row: all screenings + buttons (See Movie Page, IMDb if available)
+                const detailRow = document.createElement('tr');
+                detailRow.className = 'detail-row';
+                detailRow.style.display = 'none';
+                const detailCell = document.createElement('td');
+                detailCell.className = 'detail-cell';
+                detailCell.colSpan = document.querySelectorAll('#filmTable thead th').length || 6;
+
+                if (film.screenings && film.screenings.length) {
+                    const parts = film.screenings.map(s => {
+                        const d = new Date(s.datetime);
+                        const isPast = d < new Date();
+                        return `<li class="${isPast ? 'past' : ''}"><strong>${formatDateTime(d)}</strong> — <span class="screening-location">${s.location}</span></li>`;
+                    }).join('');
+                    const btns = [];
+                    if (film.url) btns.push(`<button class="movie-btn" onclick="window.open('${film.url}','_blank','noopener')">Виж в CineLibri</button>`);
+                    if (film.imdb && film.imdb.imdb_url) btns.push(`<button class="imdb-btn" onclick="window.open('${film.imdb.imdb_url}','_blank','noopener')">Виж в IMDb</button>`);
+                    detailCell.innerHTML = `<ul class="screening-list">${parts}</ul>${btns.join('')}`;
+                } else {
+                    detailCell.textContent = 'Няма прожекции';
+                }
+
+                detailRow.appendChild(detailCell);
+
+                mainRow.addEventListener('click', () => {
+                    const expanded = mainRow.classList.toggle('expanded');
+                    const exp = mainRow.querySelector('.expander');
+                    if (exp) exp.textContent = expanded ? '▼' : '▶';
+                    detailRow.style.display = detailRow.style.display === 'table-row' ? 'none' : 'table-row';
+                });
+
+                tbody.appendChild(mainRow);
+                tbody.appendChild(detailRow);
+            });
+        }
+
+        function sortAndRenderTable(){
+            sortFilms(currentSort.field, currentSort.direction);
+            renderTable();
+        }
+
+        function updateStats(){
+            const totalFilms = filteredFilms.length;
+            const totalScreenings = filteredFilms.reduce((sum, film) => {
+                const startDate = document.getElementById('startDate').value ? new Date(document.getElementById('startDate').value) : null;
+                const endDate = document.getElementById('endDate').value ? new Date(document.getElementById('endDate').value) : null;
+                if (startDate || endDate){
+                    return sum + film.screenings.filter(s=>{
+                        const sd = new Date(s.datetime.toDateString());
+                        if (startDate && sd < startDate) return false;
+                        if (endDate && sd > endDate) return false;
+                        return true;
+                    }).length;
+                } else {
+                    return sum + film.screenings.length;
+                }
+            }, 0);
+            document.getElementById('stats').textContent = `Показани ${totalFilms} филма с ${totalScreenings} прожекции`;
+        }
+
+        // Init
+        document.addEventListener('DOMContentLoaded', function(){
+            initializeFilters();
+            applyFilters();
+
+            // attach sort handlers (headers were created dynamically)
+            document.querySelectorAll('th[data-sort]').forEach(th => {
+                th.addEventListener('click', function(){
+                    const field = this.dataset.sort;
+                    if (currentSort.field === field) currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
+                    else { currentSort.field = field; currentSort.direction = 'asc'; }
+                    document.querySelectorAll('th').forEach(h => h.classList.remove('sorted-asc','sorted-desc'));
+                    this.classList.add(currentSort.direction === 'asc' ? 'sorted-asc' : 'sorted-desc');
+                    sortAndRenderTable();
+                });
+            });
+
+            ['startDate','endDate','locationFilter'].forEach(id=>{
+                const el = document.getElementById(id);
+                if (el) el.addEventListener('change', applyFilters);
+            });
+        });
+    </script>
+</body>
+</html>
