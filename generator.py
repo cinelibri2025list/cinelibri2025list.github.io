@@ -84,7 +84,7 @@ def generate_index(
     out_path: str = "./deploy/index.html",
 ):
     tpl_path = Path(template_path)
-    os.makedirs(tpl_path.parent, exist_ok=True)
+    os.makedirs(Path(out_path).parent, exist_ok=True)
     if not tpl_path.exists():
         print(f"Template file not found: {tpl_path.resolve()}")
         print(
