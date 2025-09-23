@@ -58,13 +58,7 @@ jobs:
         run: npm install -g html-minifier-terser
 
       - name: Minify index.html
-        run: html-minifier-terser index.html \
-              --collapse-whitespace \
-              --remove-comments \
-              --remove-optional-tags \
-              --minify-css true \
-              --minify-js true \
-              -o index.html
+        run: html-minifier-terser index.html --collapse-whitespace --remove-comments --remove-optional-tags --minify-css true --minify-js true -o index.html
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
