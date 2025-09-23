@@ -212,7 +212,6 @@ def parse_film_details(url: str, html_content) -> Film:
         imdb = get_imdb_data(id, original_title, year)
     except Exception as e:
         imdb = None
-        raise
 
     return Film(
         id=id,
@@ -240,8 +239,7 @@ async def main():
     films = []
     for link in links:
         films.append(await get_film(link))
-        print(films[0])
-        exit(0)
+
     generate_index(films)
 
 
