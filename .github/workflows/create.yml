@@ -1,4 +1,4 @@
-name: Build and Update Deploy Branch
+name: Build and Publish
 
 on:
   push:
@@ -11,7 +11,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-
+    outputs:
+      deploy_dir: ${{ steps.set-deploy-dir.outputs.deploy_dir }}
     steps:
       - uses: actions/checkout@v4
 
@@ -29,6 +30,10 @@ jobs:
       - name: Run generator
         run: uv run python generator.py
 
+      - name: Set deploy directory output
+        id: set-deploy-dir
+        run: echo "deploy_dir=./deploy" >> $GITHUB_OUTPUT
+
       - name: Deploy index.html to deploy branch
         uses: peaceiris/actions-gh-pages@v4
         with:
@@ -36,3 +41,36 @@ jobs:
           publish_branch: deploy
           publish_dir: ./deploy
           keep_files: true
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout deploy branch
+        uses: actions/checkout@v4
+        with:
+          ref: deploy
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Install deps
+        run: npm install -g html-minifier-terser
+
+      - name: Minify index.html
+        run: html-minifier-terser index.html \
+              --collapse-whitespace \
+              --remove-comments \
+              --remove-optional-tags \
+              --minify-css true \
+              --minify-js true \
+              -o index.html
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: './'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
