@@ -7,6 +7,7 @@ from datetime import datetime
 from functools import cache
 from pathlib import Path
 from urllib.parse import urlparse
+import os
 
 import dateparser
 import httpx
@@ -80,9 +81,10 @@ def serialize_films(films: list[Film]) -> str:
 def generate_index(
     films: list[Film],
     template_path: str = "html_template.html",
-    out_path: str = "index.html",
+    out_path: str = "./deploy/index.html",
 ):
     tpl_path = Path(template_path)
+    os.makedirs(tpl_path.parent, exist_ok=True)
     if not tpl_path.exists():
         print(f"Template file not found: {tpl_path.resolve()}")
         print(

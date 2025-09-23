@@ -10,12 +10,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0   # need history to switch branches
+      - uses: actions/checkout@v4
 
-      - name: Set up Python 3.12
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -23,30 +20,16 @@ jobs:
       - name: Install uv
         run: pip install uv
 
-      - name: Sync dependencies
+      - name: Install dependencies
         run: uv sync
 
       - name: Run generator
-        run: uv run python3 generator.py
+        run: uv run python generator.py
 
-      - name: Save generated file
-        run: cp index.html /tmp/index.html
-
-      - name: Commit index.html to deploy branch
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          # Switch to deploy branch
-          git checkout deploy
-
-          # Restore generated file
-          cp /tmp/index.html index.html
-
-          git add index.html
-          if ! git diff --cached --quiet; then
-            git commit -m "Update index.html from main: ${GITHUB_SHA}"
-            git push origin deploy
-          else
-            echo "No changes to index.html, skipping commit"
-          fi
+      - name: Deploy index.html to deploy branch
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_branch: deploy
+          publish_dir: ./deploy
+          keep_files: true   # keep your workflow files and anything else in deploy
