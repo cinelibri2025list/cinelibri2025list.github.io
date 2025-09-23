@@ -1,8 +1,24 @@
 {
-  "curations": [
-    {
-      "id": "chuzhdenecyt",
-      "imdb_id": "36243564"
-    }
-  ]
+    "curations":[
+        {
+            "id":"chuzhdenecyt",
+            "imdb_id":"36243564"
+        },
+        {
+            "id":"nai-bogatata-zhena-na-sveta",
+            "imdb_id":"32759477"
+        },
+        {
+            "id":"djani-versache-imperator-na-mechtite",
+            "imdb_id":"22792538"
+        },
+        {
+            "id":"estestvena-istoriya-na-razrushenieto",
+            "imdb_id":"19725896"
+        },
+        {
+            "id":"zavryshtaneto-na-tsarya",
+            "imdb_id":null
+        }
+    ]
 }

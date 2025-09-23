@@ -50,7 +50,7 @@ class Film:
 @dataclass
 class ImdbCuration:
     id: str
-    imdb_id: str
+    imdb_id: str | None
     imdb_score: float | None = None
 
 
@@ -115,6 +115,10 @@ def get_imdb_data(id, original_title, year) -> ImdbData | None:
 
     if id in curations:
         curation = curations[id]
+
+        if curation.imdb_id is None:
+            return None
+
         imdb_id = f"tt{curation.imdb_id.replace('tt', '')}"
         imdb_url = f"https://www.imdb.com/title/{imdb_id}/"
         if curation.imdb_score is not None:
