@@ -8,6 +8,11 @@ on:
     - cron: "0 */12 * * *"
   workflow_dispatch:
 
+permissions:
+  contents: write       # Needed for checkout/push
+  pages: write          # Needed to deploy to GitHub Pages
+  id-token: write       # Needed for deploy-pages
+
 jobs:
   build:
     runs-on: ubuntu-latest
